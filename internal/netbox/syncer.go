@@ -69,28 +69,41 @@ func (s *Syncer) Sync(hw models.Hardware) error {
 	}
 	log.Info().Int("site_id", siteID).Msg("step 1 site ok")
 
-	// STEP 2 — Manufacturer
+	// STEP 2 — Check if device already exists
+	// If it does we skip device type resolution entirely
+	// Device type is set ONCE on creation and never updated
+	existingDeviceID, deviceExists, err := s.client.FindDeviceBySerial(hw.Identifier.Value)
+	if err != nil {
+		return fmt.Errorf("step 2 device lookup: %w", err)
+	}
+
+	// STEP 3 — Manufacturer (always needed for context)
 	mfrID, err := s.resolveManufacturer(hw.System.Manufacturer)
 	if err != nil {
-		return fmt.Errorf("step 2 manufacturer: %w", err)
+		return fmt.Errorf("step 3 manufacturer: %w", err)
 	}
-	log.Info().Int("manufacturer_id", mfrID).Msg("step 2 manufacturer ok")
+	log.Info().Int("manufacturer_id", mfrID).Msg("step 3 manufacturer ok")
 
-	// STEP 3 — Device Role
+	// STEP 4 — Device Role
 	roleID, err := s.client.GetOrCreateDeviceRole(s.role)
 	if err != nil {
-		return fmt.Errorf("step 3 device role: %w", err)
+		return fmt.Errorf("step 4 device role: %w", err)
 	}
-	log.Info().Int("role_id", roleID).Msg("step 3 device role ok")
+	log.Info().Int("role_id", roleID).Msg("step 4 device role ok")
 
-	// STEP 4 — Device Type
-	deviceTypeID, err := s.resolveDeviceType(hw.System.Model, hw.System.Manufacturer, hw.System.UHeight, mfrID)
-	if err != nil {
-		return fmt.Errorf("step 4 device type: %w", err)
+	// STEP 5 — Device Type (only on first creation)
+	var deviceTypeID int
+	if !deviceExists {
+		deviceTypeID, err = s.resolveDeviceType(hw.System.Model, hw.System.Manufacturer, hw.System.UHeight, mfrID)
+		if err != nil {
+			return fmt.Errorf("step 5 device type: %w", err)
+		}
+		log.Info().Int("device_type_id", deviceTypeID).Msg("step 5 device type ok")
+	} else {
+		log.Debug().Msg("step 5 device type skipped — device exists, respecting current type")
 	}
-	log.Info().Int("device_type_id", deviceTypeID).Msg("step 4 device type ok")
 
-	// STEP 5 — Platform (OS)
+	// STEP 6 — Platform (OS)
 	var platformID *int
 	if hw.OS.Name != "" {
 		osName := fmt.Sprintf("%s %s", hw.OS.Name, hw.OS.Version)
@@ -99,32 +112,43 @@ func (s *Syncer) Sync(hw models.Hardware) error {
 			log.Warn().Err(err).Msg("platform sync failed — continuing")
 		} else {
 			platformID = &pid
-			log.Info().Int("platform_id", pid).Msg("step 5 platform ok")
+			log.Info().Int("platform_id", pid).Msg("step 6 platform ok")
 		}
 	}
 
-	// STEP 6 — Custom fields
+	// STEP 7 — Custom fields
 	customFields := buildCustomFields(hw)
 
-	// STEP 7 — Tags
+	// STEP 8 — Tags
 	tags := buildTags(hw.Identifier.Source)
 
-	// STEP 8 — Device
-	deviceID, err := s.client.GetOrCreateDevice(
-		hw.Identifier.Value,
-		hw.Identifier.Source,
-		"",
-		deviceTypeID,
-		roleID,
-		siteID,
-		customFields,
-		platformID,
-		tags,
-	)
-	if err != nil {
-		return fmt.Errorf("step 8 device: %w", err)
+	// STEP 9 — Device
+	var deviceID int
+	if deviceExists {
+		// UPDATE — never touch device type
+		if err := s.client.UpdateDevice(existingDeviceID, hw.Identifier.Value, customFields, platformID, tags); err != nil {
+			return fmt.Errorf("step 9 device update: %w", err)
+		}
+		deviceID = existingDeviceID
+		log.Info().Int("device_id", deviceID).Msg("step 9 device updated")
+	} else {
+		// CREATE — set device type once
+		deviceID, err = s.client.CreateDevice(
+			hw.Identifier.Value,
+			hw.Identifier.Source,
+			"",
+			deviceTypeID,
+			roleID,
+			siteID,
+			customFields,
+			platformID,
+			tags,
+		)
+		if err != nil {
+			return fmt.Errorf("step 9 device create: %w", err)
+		}
+		log.Info().Int("device_id", deviceID).Msg("step 9 device created")
 	}
-	log.Info().Int("device_id", deviceID).Msg("step 8 device ok")
 
 	// STEP 9 — Inventory Items
 	inventoryItems := buildInventoryPayloads(deviceID, hw)

@@ -27,8 +27,7 @@ type deviceUpdatePayload struct {
 }
 
 // GetOrCreateDevice returns the ID of a device, creating it if it does not exist.
-// Device name format: hostname-serial
-// This is always kept in sync — binary is the source of truth.
+// Kept for standalone mode compatibility.
 func (c *Client) GetOrCreateDevice(
 	identifierValue string,
 	identifierSource string,
@@ -38,31 +37,35 @@ func (c *Client) GetOrCreateDevice(
 	platformID *int,
 	tags []map[string]string,
 ) (int, error) {
-	// Resolve hostname
+	id, found, err := c.FindDeviceBySerial(identifierValue)
+	if err != nil {
+		return 0, err
+	}
+	if found {
+		return id, c.UpdateDevice(id, identifierValue, customFields, platformID, tags)
+	}
+	return c.CreateDevice(identifierValue, identifierSource, hostname, deviceTypeID, roleID, siteID, customFields, platformID, tags)
+}
+
+// CreateDevice creates a new device in NetBox.
+// Device type is set here and never changed after.
+func (c *Client) CreateDevice(
+	identifierValue string,
+	identifierSource string,
+	hostname string,
+	deviceTypeID, roleID, siteID int,
+	customFields map[string]interface{},
+	platformID *int,
+	tags []map[string]string,
+) (int, error) {
 	h := hostname
 	if h == "" {
 		h, _ = os.Hostname()
 	}
-
-	// Name format: hostname-serial
-	// Binary is source of truth — always reflects real server identity
 	name := fmt.Sprintf("%s-%s", h, identifierValue)
 
-	// Search by serial/identifier
-	id, found, err := c.findDeviceBySerial(identifierValue)
-	if err != nil {
-		return 0, err
-	}
-
-	if found {
-		// Update existing device including name
-		// Binary is source of truth — name always reflects reality
-		return id, c.updateDevice(id, name, identifierValue, customFields, platformID, tags)
-	}
-
-	// Create new device
 	var created idResponse
-	err = c.post("/api/dcim/devices/", devicePayload{
+	err := c.post("/api/dcim/devices/", devicePayload{
 		Name:         name,
 		DeviceType:   deviceTypeID,
 		Role:         roleID,
@@ -81,8 +84,21 @@ func (c *Client) GetOrCreateDevice(
 	return created.ID, nil
 }
 
+// UpdateDevice updates an existing device — never touches device type.
+func (c *Client) UpdateDevice(
+	id int,
+	serial string,
+	customFields map[string]interface{},
+	platformID *int,
+	tags []map[string]string,
+) error {
+	h, _ := os.Hostname()
+	name := fmt.Sprintf("%s-%s", h, serial)
+	return c.updateDevice(id, name, serial, customFields, platformID, tags)
+}
+
 // findDeviceBySerial searches for a device by serial number field.
-func (c *Client) findDeviceBySerial(serial string) (int, bool, error) {
+func (c *Client) FindDeviceBySerial(serial string) (int, bool, error) {
 	var list listResponse
 	if err := c.get(fmt.Sprintf("/api/dcim/devices/?serial=%s", serial), &list); err != nil {
 		return 0, false, fmt.Errorf("searching device by serial: %w", err)
