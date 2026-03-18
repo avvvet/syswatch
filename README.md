@@ -1,8 +1,8 @@
 # syswatch
 
-Automated hardware inventory for NetBox. Runs on any Linux server, collects hardware via SMBIOS, and syncs to NetBox automatically.
+Automated hardware inventory for NetBox. Collects hardware via SMBIOS and syncs to NetBox automatically.
 
-Single binary. Zero dependencies. Works on bare metal and VMs.
+Single binary. Zero dependencies.
 
 ---
 
@@ -37,7 +37,7 @@ SYSWATCH_MODE=standalone  # no syswatch-api needed, limited matching
 ## Quick Install
 
 ```bash
-coming
+comming
 ```
 
 ---
@@ -125,7 +125,7 @@ Device name in NetBox: `hostname-serial` (e.g. `web01-5CD237789L`)
 
 ---
 
-## Schedule
+## Schedule (optional)
 
 ```bash
 # Run every 6 hours via cron
