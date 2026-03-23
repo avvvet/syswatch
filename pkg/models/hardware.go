@@ -4,13 +4,15 @@ package models
 // This is the central data structure passed between the collector
 // and the NetBox sync layer.
 type Hardware struct {
-	System     System
-	Identifier Identifier
-	CPU        CPU
-	Memory     []MemoryModule
-	Disks      []Disk
-	NICs       []NIC
-	OS         OS
+	System        System
+	Identifier    Identifier
+	CPU           CPU
+	Memory        []MemoryModule
+	Disks         []Disk
+	NICs          []NIC
+	OS            OS
+	PowerSupplies []PowerSupply
+	GPUs          []GPU
 }
 
 // System holds top level server identity.
@@ -75,4 +77,21 @@ type OS struct {
 	Version string // e.g. 22.04
 	Kernel  string // e.g. 5.15.0-91-generic
 	Slug    string // e.g. ubuntu-22-04
+}
+
+// PowerSupply represents a single PSU unit.
+type PowerSupply struct {
+	Name         string // e.g. PSU 0
+	Manufacturer string // e.g. Delta
+	Serial       string // per PSU serial
+	PartNumber   string // part/model number
+	MaxWatts     int    // maximum wattage e.g. 800
+	Status       string // e.g. present, not-present
+}
+
+// GPU represents a single graphics processing unit.
+type GPU struct {
+	Name         string // e.g. NVIDIA A100
+	Manufacturer string // e.g. NVIDIA
+	Address      string // PCI address e.g. 0000:01:00.0
 }

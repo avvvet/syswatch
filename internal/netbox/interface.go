@@ -73,6 +73,13 @@ func (c *Client) SyncInterfaces(deviceID int, nics []nicItem) error {
 				c.log.Warn().Err(err).Str("mac", nic.MACAddress).Msg("failed to sync MAC address")
 			}
 		}
+
+		// Handle IP address
+		if nic.IPAddress != "" {
+			if err := c.SyncIPAddress(ifaceID, nic.IPAddress); err != nil {
+				c.log.Warn().Err(err).Str("ip", nic.IPAddress).Msg("failed to sync IP address")
+			}
+		}
 	}
 
 	return nil

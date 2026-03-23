@@ -98,6 +98,24 @@ func (c *Collector) CollectAll() models.Hardware {
 			Msg("os collected")
 	}
 
+	// Power Supplies
+	psus, err := collectPowerSupplies()
+	if err != nil {
+		c.log.Warn().Err(err).Msg("power supply collection failed — continuing")
+	} else {
+		hw.PowerSupplies = psus
+		c.log.Info().Int("psu_count", len(psus)).Msg("power supplies collected")
+	}
+
+	// GPUs
+	gpus, err := collectGPUs()
+	if err != nil {
+		c.log.Warn().Err(err).Msg("gpu collection failed — continuing")
+	} else {
+		hw.GPUs = gpus
+		c.log.Info().Int("gpu_count", len(gpus)).Msg("gpus collected")
+	}
+
 	// Resolve unique identifier using fallback chain
 	nicsForID := make([]nicForIdentifier, len(hw.NICs))
 	for i, nic := range hw.NICs {

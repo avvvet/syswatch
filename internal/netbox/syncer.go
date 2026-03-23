@@ -56,11 +56,14 @@ func (s *Syncer) Sync(hw models.Hardware) error {
 		Str("mode", s.mode()).
 		Msg("starting NetBox sync")
 
-	// STEP 0 — Ensure required tags exist
+	// STEP 0 — Ensure required tags and custom fields exist
 	if err := s.client.EnsureRequiredTags(); err != nil {
 		return fmt.Errorf("step 0 tags: %w", err)
 	}
-	log.Info().Msg("step 0 tags ok")
+	if err := s.client.EnsureCustomFields(); err != nil {
+		return fmt.Errorf("step 0 custom fields: %w", err)
+	}
+	log.Info().Msg("step 0 tags and custom fields ok")
 
 	// STEP 1 — Site
 	siteID, err := s.client.GetSiteID(s.site)
@@ -317,6 +320,37 @@ func buildInventoryPayloads(deviceID int, hw models.Hardware) []inventoryItemPay
 			Serial:      disk.Serial,
 			PartID:      disk.Model,
 			Description: fmt.Sprintf("%dGB %s", disk.SizeGB, disk.Type),
+			Discovered:  true,
+		})
+	}
+
+	// Power Supplies
+	for _, psu := range hw.PowerSupplies {
+		desc := psu.Status
+		if psu.MaxWatts > 0 {
+			desc = fmt.Sprintf("%dW — %s", psu.MaxWatts, psu.Status)
+		}
+		items = append(items, inventoryItemPayload{
+			Device:      deviceID,
+			Name:        psu.Name,
+			Serial:      psu.Serial,
+			PartID:      psu.PartNumber,
+			Description: desc,
+			Discovered:  true,
+		})
+	}
+
+	// GPUs
+	for i, gpu := range hw.GPUs {
+		name := fmt.Sprintf("GPU %d", i)
+		desc := gpu.Address
+		if gpu.Manufacturer != "" || gpu.Name != "" {
+			desc = fmt.Sprintf("%s %s — %s", gpu.Manufacturer, gpu.Name, gpu.Address)
+		}
+		items = append(items, inventoryItemPayload{
+			Device:      deviceID,
+			Name:        name,
+			Description: strings.TrimSpace(desc),
 			Discovered:  true,
 		})
 	}
