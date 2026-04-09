@@ -169,6 +169,18 @@ func (s *Syncer) Sync(hw models.Hardware) error {
 		log.Info().Int("nic_count", len(nics)).Msg("step 10 interfaces ok")
 	}
 
+	// STEP 11 — OOB management IP (iDRAC/iLO)
+	if hw.OOB.IPAddress != "" {
+		if err := s.client.SyncOOBAddress(deviceID, hw.OOB.IPAddress); err != nil {
+			log.Warn().Err(err).Msg("OOB IP sync failed — continuing")
+		} else {
+			log.Info().
+				Str("ip", hw.OOB.IPAddress).
+				Str("interface", hw.OOB.Name).
+				Msg("step 11 OOB IP ok")
+		}
+	}
+
 	log.Info().
 		Int("device_id", deviceID).
 		Str("identifier", hw.Identifier.Value).

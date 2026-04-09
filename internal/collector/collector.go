@@ -116,6 +116,20 @@ func (c *Collector) CollectAll() models.Hardware {
 		c.log.Info().Int("gpu_count", len(gpus)).Msg("gpus collected")
 	}
 
+	// Out-of-band management IP (iDRAC/iLO/BMC)
+	oob, err := collectOOBIP()
+	if err != nil {
+		c.log.Warn().Err(err).Msg("OOB IP collection failed — continuing")
+	} else if oob.IPAddress != "" {
+		hw.OOB = oob
+		c.log.Info().
+			Str("interface", oob.Name).
+			Str("ip", oob.IPAddress).
+			Msg("OOB management IP collected")
+	} else {
+		c.log.Debug().Msg("no OOB management interface detected")
+	}
+
 	// Resolve unique identifier using fallback chain
 	nicsForID := make([]nicForIdentifier, len(hw.NICs))
 	for i, nic := range hw.NICs {

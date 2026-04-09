@@ -13,6 +13,7 @@ type Hardware struct {
 	OS            OS
 	PowerSupplies []PowerSupply
 	GPUs          []GPU
+	OOB           OOBInterface
 }
 
 // System holds top level server identity.
@@ -94,4 +95,12 @@ type GPU struct {
 	Name         string // e.g. NVIDIA A100
 	Manufacturer string // e.g. NVIDIA
 	Address      string // PCI address e.g. 0000:01:00.0
+}
+
+// OOBInterface represents the out-of-band management interface.
+// This is iDRAC on Dell, iLO on HP, or generic IPMI/BMC.
+// Used for remote server management independent of the main OS.
+type OOBInterface struct {
+	Name      string // interface name e.g. idrac, ilo, usb0
+	IPAddress string // IP with prefix e.g. 192.168.1.100/24
 }
